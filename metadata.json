@@ -1,0 +1,6 @@
+{
+  "name": "SaúdeAntar-ia",
+  "description": "Hub audiovisual, científico e documental sobre experiência na Antártica e missões PROANTAR.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
