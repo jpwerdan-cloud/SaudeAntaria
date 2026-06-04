@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antártica 3D — Atlas Interativo</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sea:       #060d18;
+    --sea-mid:   #0d1e30;
+    --accent:    #4fc3f7;
+    --accent2:   #81d4fa;
+    --warm:      #ff9a3c;
+    --green:     #00e676;
+    --red:       #ff5252;
+    --yellow:    #ffd740;
+    --purple:    #ce93d8;
+    --text:      #ddeef7;
+    --muted:     #5c8fa8;
+    --card-bg:   rgba(6,13,24,0.96);
+    --card-bd:   rgba(79,195,247,0.18);
+    --radius:    14px;
+  }
+
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    width:100%; height:100%;
+    background: var(--sea);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 58px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.6rem;
+    background: linear-gradient(to bottom, rgba(6,13,24,0.98) 70%, transparent);
+    pointer-events: none;
+  }
+
+  .h-brand {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    pointer-events: all;
+  }
+
+  .h-brand h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .h-brand h1 span { color: var(--accent); }
+
+  .h-brand p {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    margin-bottom: 1px;
+  }
+
+  .h-pills {
+    display: flex;
+    gap: 0.7rem;
+    pointer-events: all;
+  }
+
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid rgba(79,195,247,0.18);
+    border-radius: 999px;
+    font-size: 0.67rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: rgba(6,13,24,0.6);
+    backdrop-filter: blur(6px);
+  }
+
+  .pill-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 2s infinite;
+  }
+
+  @keyframes blink {
+    0%,100%{ opacity:1; } 50%{ opacity:0.3; }
+  }
+
+  /* ── IFRAME VIEWER ── */
+  #viewer-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  #sketchfab-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* ── STATION LIST (left panel) ── */
+  #station-list {
+    position: fixed;
+    left: 0; top: 58px; bottom: 0;
+    width: 240px;
+    z-index: 100;
+    padding: 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    overflow-y: auto;
+    background: linear-gradient(to right, rgba(6,13,24,0.92) 80%, transparent);
+    backdrop-filter: blur(4px);
+    pointer-events: all;
+  }
+
+  .list-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    padding: 0.4rem 0.5rem 0.8rem;
+    border-bottom: 1px solid rgba(79,195,247,0.08);
+    margin-bottom: 0.3rem;
+  }
+
+  .stn-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.7rem;
+    border-radius: 9px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--text);
+    text-align: left;
+    width: 100%;
+    transition: background 0.18s, border-color 0.18s, transform 0.12s;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .stn-btn:hover {
+    background: rgba(79,195,247,0.07);
+    border-color: rgba(79,195,247,0.15);
+    transform: translateX(3px);
+  }
+
+  .stn-btn.active {
+    background: rgba(79,195,247,0.1);
+    border-color: rgba(79,195,247,0.25);
+  }
+
+  .stn-color {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  .stn-info strong {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .stn-info span {
+    font-size: 0.67rem;
+    color: var(--muted);
+  }
+
+  .stn-idx {
+    margin-left: auto;
+    font-size: 0.62rem;
+    color: var(--muted);
+    background: rgba(79,195,247,0.08);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  /* ── DETAIL CARD (right panel) ── */
+  #detail-card {
+    position: fixed;
+    right: 1.2rem; top: 72px;
+    width: 320px;
+    z-index: 150;
+    background: var(--card-bg);
+    border: 1px solid var(--card-bd);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(79,195,247,0.05), 0 24px 64px rgba(0,0,0,0.75);
+    backdrop-filter: blur(18px);
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+  }
+
+  #detail-card.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+  }
+
+  .dc-media {
+    position: relative;
+    height: 170px;
+    overflow: hidden;
+  }
+
+  .dc-media img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .dc-media-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 35%, rgba(6,13,24,0.9) 100%);
+  }
+
+  .dc-flag {
+    position: absolute;
+    bottom: 10px; left: 12px;
+    font-size: 1.5rem;
+  }
+
+  .dc-anno-badge {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-size: 0.6rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-weight: 600;
+    background: rgba(79,195,247,0.22);
+    color: var(--accent2);
+    border: 1px solid rgba(79,195,247,0.3);
+  }
+
+  .dc-body { padding: 1rem 1.1rem 1.1rem; }
+
+  .dc-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 2px;
+  }
+
+  .dc-fullname {
+    font-size: 0.67rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.65rem;
+  }
+
+  .dc-desc {
+    font-size: 0.77rem;
+    color: #7db4cc;
+    line-height: 1.65;
+    margin-bottom: 0.75rem;
+  }
+
+  .dc-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .dc-stat {
+    font-size: 0.67rem;
+    background: rgba(79,195,247,0.07);
+    border: 1px solid rgba(79,195,247,0.12);
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: var(--muted);
+  }
+
+  .dc-stat b { color: var(--text); font-weight: 500; }
+
+  .dc-close {
+    position: absolute;
+    top: 8px; left: 8px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.4);
+    color: rgba(255,255,255,0.7);
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+    z-index: 5;
+  }
+
+  .dc-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+  /* ── BOTTOM CONTROLS ── */
+  #bottom-bar {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex;
+    gap: 0.6rem;
+    pointer-events: all;
+  }
+
+  .ctrl-btn {
+    padding: 0.45rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(79,195,247,0.22);
+    background: rgba(6,13,24,0.85);
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-family: 'Space Grotesk', sans-serif;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(8px);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .ctrl-btn:hover, .ctrl-btn.on {
+    background: rgba(79,195,247,0.12);
+    border-color: rgba(79,195,247,0.4);
+    color: var(--accent2);
+  }
+
+  /* ── LOADING SCREEN ── */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: var(--sea);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    transition: opacity 0.6s ease;
+  }
+
+  #loading-screen.done { opacity: 0; pointer-events: none; }
+
+  .load-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .load-title span { color: var(--accent); }
+
+  .load-bar-wrap {
+    width: 240px;
+    height: 3px;
+    background: rgba(79,195,247,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .load-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  .load-sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* ── ANNOTATION INDICATOR ── */
+  #anno-hint {
+    position: fixed;
+    bottom: 4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.67rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: rgba(6,13,24,0.7);
+    padding: 0.35rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(79,195,247,0.1);
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    animation: hintFade 6s ease 3s forwards;
+  }
+
+  @keyframes hintFade {
+    0%{ opacity:0; } 15%{ opacity:0.8; } 80%{ opacity:0.8; } 100%{ opacity:0; }
+  }
+
+  /* scrollbar */
+  #station-list::-webkit-scrollbar { width: 3px; }
+  #station-list::-webkit-scrollbar-track { background: transparent; }
+  #station-list::-webkit-scrollbar-thumb { background: rgba(79,195,247,0.2); border-radius:2px; }
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="load-title">ANTÁRTICA<span>.</span></div>
+  <div class="load-bar-wrap"><div class="load-bar" id="load-bar"></div></div>
+  <div class="load-sub" id="load-sub">Carregando modelo 3D…</div>
+</div>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="h-brand">
+    <h1>ANTÁRTICA <span>3D</span></h1>
+    <p>Atlas Interativo · Estações de Pesquisa</p>
+  </div>
+  <div class="h-pills">
+    <div class="pill"><span class="pill-dot"></span>Modelo 3D ao vivo</div>
+    <div class="pill" id="temp-pill">Polo Sul: −49°C</div>
+    <div class="pill">10 Estações</div>
+  </div>
+</div>
+
+<!-- STATION LIST -->
+<div id="station-list">
+  <div class="list-label">▸ Estações &amp; Locais</div>
+  <!-- buttons injected by JS -->
+</div>
+
+<!-- DETAIL CARD -->
+<div id="detail-card">
+  <button class="dc-close" onclick="closeCard()" title="Fechar">✕</button>
+  <div class="dc-media">
+    <img id="dc-img" src="" alt=""/>
+    <div class="dc-media-overlay"></div>
+    <div class="dc-flag" id="dc-flag"></div>
+    <div class="dc-anno-badge" id="dc-badge">Anotação 3D</div>
+  </div>
+  <div class="dc-body">
+    <div class="dc-name" id="dc-name">—</div>
+    <div class="dc-fullname" id="dc-fullname">—</div>
+    <div class="dc-desc" id="dc-desc">—</div>
+    <div class="dc-stats" id="dc-stats"></div>
+  </div>
+</div>
+
+<!-- SKETCHFAB VIEWER -->
+<div id="viewer-wrap">
+  <iframe
+    id="sketchfab-iframe"
+    title="Antarctica 3D Map"
+    allow="autoplay; fullscreen; xr-spatial-tracking"
+    mozallowfullscreen="true"
+    webkitallowfullscreen="true"
+    src="https://sketchfab.com/models/6e801649600845c79f00cef86f157f08/embed?autostart=1&ui_infos=0&ui_watermark=0&ui_watermark_link=0&ui_theme=dark&preload=1&annotations_visible=1&ui_annotations=1&dnt=1">
+  </iframe>
+</div>
+
+<!-- BOTTOM CONTROLS -->
+<div id="bottom-bar">
+  <button class="ctrl-btn" id="btn-reset" onclick="resetCamera()">⟳ Recentrar</button>
+  <button class="ctrl-btn" id="btn-orbit" onclick="toggleOrbit()">◎ Auto-rotação</button>
+  <button class="ctrl-btn" id="btn-top" onclick="topView()">⬆ Vista Aérea</button>
+  <button class="ctrl-btn" onclick="window.open('https://sketchfab.com/3d-models/antarctica-3d-map-6e801649600845c79f00cef86f157f08','_blank')">↗ Abrir Sketchfab</button>
+</div>
+
+<div id="anno-hint">Clique nos marcadores numerados para ver cada estação</div>
+
+<!-- Sketchfab API -->
+<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+
+<script>
+// ─────────────────────────────────────────────
+// STATION DATA
+// ─────────────────────────────────────────────
+const STATIONS = [
+  {
+    id: 'eacf',
+    name: 'EACF',
+    fullname: 'Estação Antártica Comandante Ferraz',
+    flag: '🇧🇷',
+    country: 'Brasil',
+    color: '#00e676',
+    coords: '62°05\'S  58°23\'W',
+    desc: 'Principal base de pesquisa brasileira na Antártica, na Ilha Rei George. Reconstruída entre 2012–2020 com módulos de última geração após incêndio. Realiza pesquisas em oceanografia, meteorologia e biologia polar.',
+    stats: ['Ilha Rei George', 'Desde 1984', 'Cap. 64 pesq.', 'Marinha do Brasil'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/EACF_Estacao_Antartica_Comandante_Ferraz.jpg/800px-EACF_Estacao_Antartica_Comandante_Ferraz.jpg',
+    // 3D world position on the Antarctica model (Peninsula — northwest tip)
+    pos3d: [-0.95, 0.18, 0.72],
+    posEnd: [-0.95, 0.05, 0.72],
+    camEye:    [-1.8, 0.9, 1.5],
+    camTarget: [-0.5, 0.1, 0.3],
+  },
+  {
+    id: 'cape-shirref',
+    name: 'Cape Shirreff',
+    fullname: 'ASPA 149 — Reserva Natural',
+    flag: '🇨🇱',
+    country: 'Chile',
+    color: '#ff9a3c',
+    coords: '62°28\'S  60°47\'W',
+    desc: 'Área Antártica Especialmente Protegida (ASPA 149) na Ilha Livingston. Abriga colônias de lobos-marinhos antárticos e pinguins. Acesso restrito por licença científica.',
+    stats: ['Ilha Livingston', 'ASPA Nº 149', 'INACH (Chile)', 'Biodiversidade'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Livingston_Island_Antarctica.jpg/800px-Livingston_Island_Antarctica.jpg',
+    pos3d: [-0.88, 0.20, 0.68],
+    posEnd: [-0.88, 0.06, 0.68],
+    camEye:    [-1.9, 1.0, 1.3],
+    camTarget: [-0.5, 0.1, 0.3],
+  },
+  {
+    id: 'palmer',
+    name: 'Palmer Station',
+    fullname: 'Estação Palmer — Ilha Anvers',
+    flag: '🇺🇸',
+    country: 'EUA',
+    color: '#4fc3f7',
+    coords: '64°46\'S  64°03\'W',
+    desc: 'Menor das três bases americanas, foca em ecologia marinha e biologia de aves. Na Península Antártica, uma das regiões que mais aquece no planeta. Monitoramento contínuo de krill e pinguins Adélie.',
+    stats: ['Ilha Anvers', 'Até 40 pessoas', 'NSF — EUA', 'Ecologia marinha'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Palmer_Station_2019.jpg/800px-Palmer_Station_2019.jpg',
+    pos3d: [-0.80, 0.19, 0.62],
+    posEnd: [-0.80, 0.06, 0.62],
+    camEye:    [-1.7, 1.0, 1.4],
+    camTarget: [-0.4, 0.1, 0.2],
+  },
+  {
+    id: 'frei',
+    name: 'Base Frei',
+    fullname: 'Base Presidente Eduardo Frei Montalva',
+    flag: '🇨🇱',
+    country: 'Chile',
+    color: '#ff5252',
+    coords: '62°12\'S  58°58\'W',
+    desc: 'Maior base chilena, com pista de pouso permanente conectando à Punta Arenas. Funciona como hub de logística e tem vila residencial permanente. Operada pela Força Aérea do Chile desde 1969.',
+    stats: ['Ilha Rei George', 'Pista 1.300 m', 'FACH — Chile', 'Hub logístico'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Base_Presidente_Eduardo_Frei_Montalva.jpg/800px-Base_Presidente_Eduardo_Frei_Montalva.jpg',
+    pos3d: [-0.92, 0.21, 0.70],
+    posEnd: [-0.92, 0.07, 0.70],
+    camEye:    [-1.8, 0.9, 1.4],
+    camTarget: [-0.5, 0.1, 0.3],
+  },
+  {
+    id: 'carlini',
+    name: 'Base Carlini',
+    fullname: 'Base Carlini (ex-Jubany)',
+    flag: '🇦🇷',
+    country: 'Argentina',
+    color: '#ffd740',
+    coords: '62°14\'S  58°40\'W',
+    desc: 'Base argentina em operação conjunta com o Instituto Alfred Wegener da Alemanha. Pesquisa em biologia marinha, glaciologia e mudanças climáticas. Operação permanente desde 1953.',
+    stats: ['Ilha Rei George', 'Desde 1953', 'DNA — Argentina', 'Parceria Alemanha'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Jubany_Base_Antarctica.jpg/800px-Jubany_Base_Antarctica.jpg',
+    pos3d: [-0.90, 0.21, 0.68],
+    posEnd: [-0.90, 0.07, 0.68],
+    camEye:    [-1.8, 0.9, 1.5],
+    camTarget: [-0.5, 0.1, 0.3],
+  },
+  {
+    id: 'halley',
+    name: 'Halley VI',
+    fullname: 'British Antarctic Survey Station',
+    flag: '🇬🇧',
+    country: 'Reino Unido',
+    color: '#ce93d8',
+    coords: '75°35\'S  26°33\'W',
+    desc: 'A estação mais inovadora: módulos sobre esquis que são rebocados pelo gelo em movimento. Foi onde o buraco na camada de ozônio foi descoberto em 1985. Monitora clima global e aurora austral.',
+    stats: ['Plataforma Brunt', 'Ozônio — 1985', 'BAS — UK', 'Módulos móveis'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Halley_VI_Research_Station.jpg/800px-Halley_VI_Research_Station.jpg',
+    pos3d: [0.35, 0.10, 0.62],
+    posEnd: [0.35, -0.04, 0.62],
+    camEye:    [1.2, 1.1, 1.6],
+    camTarget: [0.2, 0.0, 0.3],
+  },
+  {
+    id: 'mcmurdo',
+    name: 'McMurdo',
+    fullname: 'McMurdo Station — Terra de Victoria',
+    flag: '🇺🇸',
+    country: 'EUA',
+    color: '#4fc3f7',
+    coords: '77°51\'S  166°40\'E',
+    desc: 'A maior base antártica do mundo: até 1.258 pessoas no verão, hospital, academia, laboratórios e pista de pouso. Hub logístico principal dos EUA no continente, operado desde 1956.',
+    stats: ['Ross Sound', 'Maior do mundo', 'NSF — EUA', '+1.000 pessoas'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/McMurdoStation_email.jpg/800px-McMurdoStation_email.jpg',
+    pos3d: [0.58, 0.05, -0.72],
+    posEnd: [0.58, -0.10, -0.72],
+    camEye:    [1.5, 1.0, -1.5],
+    camTarget: [0.3, 0.0, -0.4],
+  },
+  {
+    id: 'concordia',
+    name: 'Concordia',
+    fullname: 'Station Concordia — Dome C',
+    flag: '🇫🇷',
+    country: 'França & Itália',
+    color: '#ff9a3c',
+    coords: '75°06\'S  123°20\'E',
+    desc: 'A 3.233 m de altitude, no coração do Plateau Antártico. Usada pela ESA para simular missões a Marte. Temperaturas chegam a −84°C. Operada conjuntamente por França e Itália.',
+    stats: ['Altitude 3.233 m', 'T. min. −84°C', 'IPEV + PNRA', 'Análoga a Marte'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Concordia_Station_Winter.jpg/800px-Concordia_Station_Winter.jpg',
+    pos3d: [0.40, 0.06, -0.38],
+    posEnd: [0.40, -0.08, -0.38],
+    camEye:    [1.0, 1.2, -1.2],
+    camTarget: [0.2, 0.0, -0.2],
+  },
+  {
+    id: 'vostok',
+    name: 'Vostok',
+    fullname: 'Estação Vostok — Rússia',
+    flag: '🇷🇺',
+    country: 'Rússia',
+    color: '#ff9a3c',
+    coords: '78°27\'S  106°50\'E',
+    desc: 'Recorde histórico de frio: −89,2°C (1983). Localizada sobre o Lago Vostok, maior lago subglacial da Terra com 250 km de comprimento sob 4 km de gelo. Em operação desde o Ano Geofísico Internacional (1957).',
+    stats: ['Altitude 3.488 m', '−89,2°C recorde', 'AARI — Rússia', 'Lago subglacial'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Vostok_3.jpg/800px-Vostok_3.jpg',
+    pos3d: [0.28, 0.05, -0.52],
+    posEnd: [0.28, -0.09, -0.52],
+    camEye:    [0.8, 1.2, -1.5],
+    camTarget: [0.1, 0.0, -0.3],
+  },
+  {
+    id: 'amundsen',
+    name: 'Amundsen–Scott',
+    fullname: 'Polo Sul Geográfico — 90°S',
+    flag: '🇺🇸',
+    country: 'EUA',
+    color: '#ffffff',
+    coords: '90°00\'S — Polo Sul',
+    desc: 'No exato Polo Sul a 2.835 m de altitude. Homenageia os exploradores Roald Amundsen e Robert Scott (1911–12). Detectou ondas gravitacionais (BICEP2, 2014). O sol não se põe por 6 meses.',
+    stats: ['Polo Sul 90°S', 'Alt. 2.835 m', 'NSF — EUA', 'T. média −49°C'],
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Amundsen-Scott_South_Pole_Station_%282007-2008%29.jpg/800px-Amundsen-Scott_South_Pole_Station_%282007-2008%29.jpg',
+    pos3d: [0.0, 0.22, 0.0],
+    posEnd: [0.0, 0.06, 0.0],
+    camEye:    [0.0, 2.0, 0.1],
+    camTarget: [0.0, 0.0, 0.0],
+  }
+];
+
+// ─────────────────────────────────────────────
+// LOADING ANIMATION
+// ─────────────────────────────────────────────
+const loadBar  = document.getElementById('load-bar');
+const loadSub  = document.getElementById('load-sub');
+const loadScreen = document.getElementById('loading-screen');
+const msgs = ['Inicializando WebGL…', 'Carregando textura de gelo…', 'Processando geometria 3D…', 'Preparando anotações…', 'Quase lá…'];
+let loadPct = 0;
+const loadInterval = setInterval(() => {
+  loadPct = Math.min(loadPct + Math.random() * 18 + 4, 90);
+  loadBar.style.width = loadPct + '%';
+  loadSub.textContent = msgs[Math.floor(loadPct / 22)] || msgs[msgs.length - 1];
+}, 380);
+
+function finishLoading() {
+  clearInterval(loadInterval);
+  loadBar.style.width = '100%';
+  loadSub.textContent = 'Pronto!';
+  setTimeout(() => loadScreen.classList.add('done'), 500);
+}
+
+// ─────────────────────────────────────────────
+// BUILD STATION LIST
+// ─────────────────────────────────────────────
+const listEl = document.getElementById('station-list');
+// Keep label, inject buttons after
+STATIONS.forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'stn-btn';
+  btn.id = 'stn-' + s.id;
+  btn.innerHTML = `
+    <span class="stn-color" style="background:${s.color}; color:${s.color};"></span>
+    <div class="stn-info">
+      <strong>${s.name}</strong>
+      <span>${s.country}</span>
+    </div>
+    <span class="stn-idx">${i + 1}</span>
+  `;
+  btn.onclick = () => gotoAnnotation(i);
+  listEl.appendChild(btn);
+});
+
+// ─────────────────────────────────────────────
+// SKETCHFAB API INIT
+// ─────────────────────────────────────────────
+const iframe = document.getElementById('sketchfab-iframe');
+const client = new Sketchfab(iframe);
+let sfApi = null;
+let autoRotating = false;
+
+client.init('6e801649600845c79f00cef86f157f08', {
+  success: function(api) {
+    sfApi = api;
+    sfApi.start();
+
+    sfApi.addEventListener('viewerready', function() {
+      finishLoading();
+      setupAnnotations();
+      setupEvents();
+    });
+  },
+  error: function() {
+    loadSub.textContent = 'Erro ao carregar. Verifique a conexão.';
+    loadBar.style.background = '#ff5252';
+  },
+  ui_infos: 0,
+  ui_watermark: 0,
+  ui_theme: 'dark',
+  preload: 1,
+  annotations_visible: 1,
+  autostart: 1,
+  ui_annotations: 1,
+});
+
+// ─────────────────────────────────────────────
+// CREATE ANNOTATIONS IN 3D
+// ─────────────────────────────────────────────
+function setupAnnotations() {
+  if (!sfApi) return;
+
+  // Remove any pre-existing annotations first
+  sfApi.getAnnotationList(function(err, list) {
+    if (!err && list) {
+      list.forEach(function(anno) {
+        sfApi.removeAnnotation(anno.index, function() {});
+      });
+    }
+    // Create ours
+    STATIONS.forEach(function(s, i) {
+      sfApi.createAnnotationFromWorldPosition(
+        s.pos3d,
+        s.camEye,
+        s.camTarget,
+        (i + 1) + '. ' + s.name,
+        s.flag + ' ' + s.fullname + ' | ' + s.coords,
+        function(err, idx) {
+          if (!err) s._annoIdx = idx;
+        }
+      );
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// ANNOTATION CLICK EVENT → open detail card
+// ─────────────────────────────────────────────
+function setupEvents() {
+  if (!sfApi) return;
+
+  sfApi.addEventListener('annotationFocus', function(info) {
+    const idx = info.index; // 0-based
+    if (idx >= 0 && idx < STATIONS.length) {
+      showCard(idx);
+    }
+  });
+
+  sfApi.addEventListener('annotationBlur', function() {
+    // Don't auto-close so user can read the card
+  });
+}
+
+// ─────────────────────────────────────────────
+// SHOW DETAIL CARD
+// ─────────────────────────────────────────────
+const card = document.getElementById('detail-card');
+
+function showCard(idx) {
+  const s = STATIONS[idx];
+  if (!s) return;
+
+  document.getElementById('dc-img').src = s.img;
+  document.getElementById('dc-img').alt = s.name;
+  document.getElementById('dc-flag').textContent = s.flag;
+  document.getElementById('dc-name').textContent = s.name;
+  document.getElementById('dc-fullname').textContent = s.fullname;
+  document.getElementById('dc-desc').textContent = s.desc;
+  document.getElementById('dc-badge').textContent = 'Anotação ' + (idx + 1);
+
+  const statsEl = document.getElementById('dc-stats');
+  statsEl.innerHTML = s.stats.map(t => `<div class="dc-stat">${t}</div>`).join('');
+
+  card.classList.add('show');
+
+  // Highlight active button in list
+  document.querySelectorAll('.stn-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+}
+
+function closeCard() {
+  card.classList.remove('show');
+  document.querySelectorAll('.stn-btn').forEach(b => b.classList.remove('active'));
+}
+
+// ─────────────────────────────────────────────
+// GO TO ANNOTATION (from sidebar click)
+// ─────────────────────────────────────────────
+function gotoAnnotation(idx) {
+  showCard(idx);
+  if (!sfApi) return;
+  sfApi.gotoAnnotation(idx, { preventCameraMove: false }, function(err) {});
+}
+
+// ─────────────────────────────────────────────
+// CAMERA CONTROLS
+// ─────────────────────────────────────────────
+function resetCamera() {
+  if (!sfApi) return;
+  closeCard();
+  sfApi.recenterCamera(function() {});
+}
+
+function topView() {
+  if (!sfApi) return;
+  sfApi.setCameraLookAt([0, 3.5, 0], [0, 0, 0], 1.2, function() {});
+}
+
+function toggleOrbit() {
+  if (!sfApi) return;
+  autoRotating = !autoRotating;
+  sfApi.setUserInteraction(!autoRotating, function() {});
+  const btn = document.getElementById('btn-orbit');
+  btn.classList.toggle('on', autoRotating);
+  btn.textContent = autoRotating ? '◉ Pausar rotação' : '◎ Auto-rotação';
+  if (autoRotating) {
+    orbitLoop();
+  }
+}
+
+let orbitAngle = 0;
+function orbitLoop() {
+  if (!autoRotating || !sfApi) return;
+  sfApi.getCameraLookAt(function(err, cam) {
+    if (err || !autoRotating) return;
+    orbitAngle += 0.005;
+    const r = Math.sqrt(cam.position[0] ** 2 + cam.position[2] ** 2);
+    sfApi.setCameraLookAt(
+      [r * Math.sin(orbitAngle), cam.position[1], r * Math.cos(orbitAngle)],
+      cam.target,
+      0,
+      function() { requestAnimationFrame(orbitLoop); }
+    );
+  });
+}
+
+// ─────────────────────────────────────────────
+// TEMPERATURE TICKER
+// ─────────────────────────────────────────────
+const temps = [
+  'Polo Sul: −49°C', 'Vostok: −89°C recorde',
+  'McMurdo: −18°C', 'EACF: −5°C', 'Concordia: −84°C mín.'
+];
+let tIdx = 0;
+const tempPill = document.getElementById('temp-pill');
+setInterval(() => {
+  tIdx = (tIdx + 1) % temps.length;
+  tempPill.style.opacity = '0';
+  setTimeout(() => {
+    tempPill.textContent = temps[tIdx];
+    tempPill.style.opacity = '1';
+  }, 300);
+}, 4500);
+tempPill.style.transition = 'opacity 0.3s';
+</script>
+
+</body>
+</html>
